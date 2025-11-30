@@ -20,14 +20,19 @@ resource "google_sql_database_instance" "instance" {
     tier = "db-f1-micro"
   }
 
-  deletion_protection  = true
+  deletion_protection  = false
 }
 
 resource "google_sql_user" "db_user" {
-    name = "appuser"
+    name     = "appuser"
     instance = google_sql_database_instance.instance.name
-    password = "supersecretpasswordinthreewordswithnumbersandcapitalizationwithamericanspelling"
+    password = "your-password"
+
+    depends_on = [
+        google_sql_database_instance.instance
+    ]
 }
+
 
 # -------------------------------------------
 # BACKEND SERVICE
@@ -58,7 +63,7 @@ resource "google_cloud_run_service" "backend" {
                     value = google_sql_user.db_user.password
                 }
             }
-            
+
         }
 
         metadata {
@@ -89,13 +94,13 @@ resource "google_cloud_run_service" "frontend" {
                 image = "europe-west1-docker.pkg.dev/cloudbros/frontend-repo/frontend:latest"
 
                 env {
-                    name = "BACKEND_URL"
+                    name = "API_ADDRESS"
                     value = google_cloud_run_service.backend.status[0].url
                 }
             }
         }
     }
-    
+
     traffic {
         percent         = 100
         latest_revision = true
