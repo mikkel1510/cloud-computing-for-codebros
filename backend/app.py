@@ -1,5 +1,5 @@
 from __future__ import annotations
-from flask import Flask, request, Response
+from flask import Flask, request, Response, jsonify
 import datetime
 import logging
 import os
@@ -9,7 +9,7 @@ from connect_connector_auto_iam_authn import connect_with_connector_auto_iam_aut
 from connect_unix import connect_unix_socket
 
 app = Flask(__name__)
-
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
 
@@ -81,20 +81,42 @@ def add_question() -> Response:
     return save_question(db, data["question"], data["answer1"], data["answer2"], data["answer3"], data["answer4"], data["correct_answer"])
     # return save_question(db, question, answer1, answer2, answer3, answer4, correct_answer)
 
+@app.route("/error")
+def make_error():
+    raise Exception("Intentional error for testing 500 alerts")
+
+@app.route("/health")
+def health():
+    return "OK", 200
+
 @app.route("/questions", methods=["GET"])
 def get_questions() -> Response:
     """Returns all questions from the database."""
     questions = []
     with db.connect() as conn:
-        # Execute the query and fetch all results
         question_rows = conn.execute(
-            sqlalchemy.text(
-                "SELECT * from quiz_questions"
-            )
+            sqlalchemy.text("SELECT * from quiz_questions")
         ).fetchall()
+
         for row in question_rows:
-            questions.append({"id": row[0], "question": row[1], "answer1": row[2], "answer2": row[3], "answer3": row[4], "answer4": row[5], "correct_answer": row[6], "time_cast": row[7]})
-        return questions
+            questions.append({
+                "id": row[0],
+                "question": row[1],
+                "answer1": row[2],
+                "answer2": row[3],
+                "answer3": row[4],
+                "answer4": row[5],
+                "correct_answer": row[6],
+                "time_cast": row[7],
+            })
+
+    logger.info({
+        "endpoint": "/questions",
+        "event": "questions_request",
+        "questions_returned": len(questions),
+    })
+
+    return jsonify(questions), 200
 
 
 def save_question(db: sqlalchemy.engine.base.Engine, question: str, answer1: str, answer2: str, answer3: str, answer4: str, correct_answer: int) -> Response:
